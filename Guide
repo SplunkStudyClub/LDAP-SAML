@@ -1,0 +1,206 @@
+The following is an article that will list out step by step methodology of using LDAP and SAML as authentication methods for Splunk. We’ll break down setting up a practice environment, configuring LDAP, and configuring SAML. A link to the video presentation is listed below if you want to follow the steps taken during the presentation.
+
+Splunk Live Demo on SAML(OKTA) & LDAP 
+
+Setting Up a Lab Environment
+The following is a quick guide to setting up a Splunk instance. This won’t require any special type of setup for the purpose of trying it out. If your customer or organization requires more stringent requires adhere to their requests. This set of instructions assumes that you have a fresh Linux host to work with.
+
+Connect to you host
+
+
+ssh user@host  
+Login as root
+
+
+sudo su - 
+Install wget and add the “splunk” user
+
+
+sudo yum -y install wget
+
+sudo adduser splunk
+Change to the directory where you want to install Splunk
+
+
+cd /opt
+Download the Splunk version you want to work with, here I’ll be using the latest Splunk version 8.2.4
+
+
+wget -O splunk-8.2.4-87e2dda940d1-Linux-x86_64.tgz 'https://download.splunk.com/products/splunk/releases/8.2.4/linux/splunk-8.2.4-87e2dda940d1-Linux-x86_64.tgz'
+Unzip your file
+
+
+sudo tar -xvzf splunk-8.2.4-87e2dda940d1-Linux-x86_64.tgz
+Assign the “splunk” user as the owner of the Splunk directory
+
+
+sudo chown -R splunk:splunk /opt/splunk
+Start Splunk
+
+
+sudo su - splunk
+/opt/splunk/bin/splunk start --accept-license --answer-yes --auto-ports --no-prompt --seed-passwd password
+Enable boot start
+
+
+exit
+sudo /opt/splunk/bin/splunk enable boot-start -user splunk
+sudo su - splunk
+Configuring LDAP
+ 
+
+Configuring SAML 
+For the SAML portion of the lab, we are using a free trial provided by Okta to set up our SAML integration instance. To recreate this portion you will need to create a trial with Okta. Follow the set up instruction on the home page, Okta Account Chooser . Confirm you account creation, login in and connect to the “Admin” page. 
+
+From the home page → click the person icon in the top right corner → click “Your Org”
+
+
+You’ll be brought to your organization’s page. From there you’ll need to click the “Admin” button and you will be redirected to a MFA page. Enter the code sent to your phone.
+
+
+ 
+
+
+After entering the code you’ll be brought the the admin dashboard. From here there are a few configuration settings that we’ll want to make to create the users and groups.
+
+
+Creating People and Groups
+Under the Directory tab, users and groups need to be created. Users will be created under the People tab and groups under Groups
+
+
+People
+Under the People page, you can Add Person, Reset Passwords, and the More Actions tab where you can import users from CSV, activate and deactivate user accounts, and address expired passwords. Here we will walkthrough adding Aleem to our organization.
+
+We’ll start by clicking the “Add Person” button
+
+
+The following screen will be provided, fill out all the information for the individual that will be added to your organization.
+
+
+After entering the information above, click save and you’ll see the user added.
+
+
+You can see that the account is staged. Click the “Activate” button under Status, a window will pop up prompting you to send an email to the individual for their account to be created. You can add a personal message if you wish, and once you’re done click send. The account status will switch to “Pending user action”
+
+
+With the accounts active, we can know assign people to groups.
+
+Groups
+To test out creating groups and integrating them into Splunk. I’ve created a “splunk_admins” and “splunk_users” group. Here we are going to assign our people to the groups. The “splunk_admin” group already has people assigned from the previous presentation linked above. We will be adding Aleem to the “splunk_users” group.
+
+We’ll click both the splunk_admins and splunk_users group to show what a completed version looks like, the process of adding users, and the finalized group settings we will be integrating into our Splunk instance.
+
+Splunk Admins Group
+Splunk Users Group
+The “splunk_users” group is currently empty. We are going to assign Aleem to this group.
+
+Click “Assign People”
+
+Simply click Aleem to add him as a member of the group and click “Save”.
+
+Because the account hasn’t been activated we still see the “Pending” under “Status”. Once the account is created it will switch to “Active”. Refer to the “splunk_admins” group for an example of what it will look like.
+
+Download SP Metadata File
+Before we can configure the Splunk Enterpise App in Okta we will need to get our certificate exchange from Splunk. We will need to go to the Splunk UI and download the “SP Metadata File”.
+
+Login to your Splunk host. Click Authentication Methods under Settings
+
+Select the SAML option and click “Configure Splunk to use SAML”
+
+Download the “SP Metadata File” by clicking the “Download File” button. This will save a file to your downloads. Next we will open it up and make a few changes. Leave this tab open we will come back to use it shortly.
+
+In any text editor, open your SPMetadata.xml file, the following example has been opened using Atom, but any text editor will work.
+
+We will need to replace the first and last line with “-----BEGIN CERTIFICATE-----” and “-----END CERTIFICATE-----”
+
+Save this file as something you’ll be able to find. For the purpose of the example I have saved this file as splunksaml.cert. This file will be needed later on when we’re configure SAML in Okta.
+
+Splunk Enterprise App in Okta
+Now that our groups and people have been created, we are ready to configure the Splunk Enterprise App within Okta to build our SAML instance. From the Admin homepage under the Dashboard tab, click the Dashboard option to show the Overview of your environment.
+
+ Click the “SSO Apps” button
+
+Click the “Browse App Catalog”
+
+In the search bar enter, “Splunk Enterprise” and click the option “Splunk Enterprise”
+
+Click “Add” on the lefthand side of the screen. We will begin filling out the option on the screen for Splunk integration. Make sure that the following options on the first screen “General Settings” are filled out.
+
+Application label → This can be any name you want to use. This will also be the name in your Okta Admin page that will be seen in the “SSO Apps”
+
+Your site URL → This can be an IP address or fully qualified domain. The URL below is a temporary lab environment.
+
+Browser plugin auto-submit → Make sure that option is selected.
+
+Click “Next”
+
+In the “Sign-On Options” fill out the areas indicated.
+
+roles → Select “Match regex” in the box to the right add “splunk_.*”
+
+The reason we are using splunk_.* is because we know that the groups we created started with splunk. You can use .* and it will select all the roles. Because it’s regex based you can choose between endless possibilites
+
+Enable Single Logout → Ensure the box is selected, this will open up the “Signature Certificate” option to upload your splunksaml.cert we created above
+
+Signature Certificate → Browse and find where you file splunksaml.cert is located. Then once selected click upload. If you did everything correct your page will match what’s shown above.
+
+If you find that your Signature Certificate, check your certificate that you followed the steps above.
+
+Finish up the settings under “Advanced Sign-on Settings” with the selected fields.
+
+Entity ID → This is the ID will use in Splunk in steps to come. I’ve chosen splunk-saml for this example
+
+Application username format → By default, Okta username is selected. If it is not, be sure to select this option. This is how you will login into Splunk. Generally that username is your “name@yourorganization.com” 
+
+Click “Done”
+
+Assigning Groups
+Under Assignments, you can individually assign people or groups. Here I have added the two Splunk groups because we already previously configured the groups above.
+
+Navigate back to the “Sign On” tab and click Edit
+
+Find the highlight portion in yellow, right click the “Identity Provider metadata” and download this metadata file
+
+Uploading Metadata File to Splunk
+From the Splunk UI under Setting → Authentication Methods → Configure SAML for Splunk. If you left this tab open from earlier switch back. We need to upload the metadata file provided from Okta by clicking the “Select File”. 
+
+Select our “metadata-splunk” file we download from Okta, upload the file, and once you upload it you should see multiple fields automatically fill out.
+
+Add the “Entity ID” we created through Okta and ensure that “Sign AuthnRequest” is selected.
+
+Add the following setting above,
+
+For the first option, enter the DNS or the IP of your host. If you’re using a load balance be sure to add the DNS or IP of that host. This example we have a single AIO (all-in-one) instance of Splunk.
+
+Redirect port, is set to zero because we do not have a load balancer, if you have one step the port here
+
+Redirect to URL, allows you to customize a page that will load after logout.
+
+SSO Binding - Set to HTTP Post
+
+SLO Binding - Set to HTTP Post
+
+Click “Save”
+
+Mapping New Groups
+You’ll see that the SAML Groups are not defined, click “New Group” in the top right corner to begin.
+
+Admins
+The “Group Name” must match the group name on Okta. Here it is “splunk_admins”. Assign the roles for this grouping and click “Save”
+
+Users
+Again, ensure the “Group Name” matches the group name in Okta and assign the role. Click “Save”
+
+At this point your SAML group mapping should look like this. Now we can login to Splunk and test that our SAML configuration works properly. We can quickly open an incognito window and login to Splunk.
+
+Type in your URL and hit Enter, you’ll be guiding through a few pages shown below.
+
+You’ll be guided to Okta through this Authenticating page
+
+Login using your account information
+
+And you’ll be brought to the Splunk UI, because my user account is under “splunk_admins” in Okta and we mapped that role to Admin in Splunk you can see that I have all the options.
+
+Before
+After
+As well, you’ll see that in the “Before” image we hadn’t logged in using SAML and below you can see that newly created user lcarter@bitsioinc.com with the “Authentication system” listed as SAML.
